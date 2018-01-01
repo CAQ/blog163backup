@@ -7,13 +7,24 @@ import datetime, urllib, re, os
 
 def get_blog(url):
     filename = 'data/' + url[url.find('static/') + 7 : -1] + '.html'
-    if os.path.exists(filename):
-        return
-    print url
+    if os.path.isfile(filename):
+      return
+    imgdir = 'img/' + url[url.find('static/') + 7 : -1]
+    if not os.path.exists(imgdir):
+      os.makedirs(imgdir)
+    imgs = os.listdir(imgdir)
+    if len(imgs) > 0:
+      return
+    #if os.path.exists(filename):
+    #    return
+    print url, len(imgs)
     # get the html page
-    soup = BeautifulSoup(urllib.urlopen(url).read())
+    content = urllib.urlopen(url).read()
+    content = content.decode('gbk').encode('utf-8')
+    content = re.sub('<head>.*?</head>', '', content, flags=re.S | re.U)
+    soup = BeautifulSoup(content)
     # the main content
-    block = soup.find('div', class_='nbw-bitm bdwb bds2 bdc0 ')
+    block = soup.find('div', {'class':'nbw-bitm bdwb bds2 bdc0 '})
     if block is None:
         return
     fw = open(filename, 'w')
@@ -40,10 +51,11 @@ def extract_metas():
     fw = open('meta.txt', 'w')
     base = './data/'
     for filename in os.listdir(base):
+        print filename
         f = open(base + filename)
         soup = BeautifulSoup(f)
-        title = soup.find('h3', class_='title pre fs1').get_text().strip()
-        metas = soup.find('p', class_='tdep clearfix nbw-act fc06').get_text()
+        title = soup.find('h3', {'class':'title pre fs1'}).get_text().strip()
+        metas = soup.find('p', {'class':'tdep clearfix nbw-act fc06'}).get_text()
         metas = re.sub('\s+', ' ', metas)
         posttime = re.search('[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}', metas).group(0).strip()
         category = re.search(u'\|\s+分类：([^\|]+)', metas, re.U).group(1).strip()
@@ -62,13 +74,14 @@ def extract_contents():
     for filename in os.listdir(base):
         f = open(base + filename)
         soup = BeautifulSoup(f)
-        maincontent = soup.find('div', class_='bct fc05 fc11 nbw-blog ztag')
+        maincontent = soup.find('div', {'class':'bct fc05 fc11 nbw-blog ztag'})
         fw = open('./txt/' + re.search('[0-9]+', filename).group(0) + '.txt', 'w')
-        for item in maincontent.find_all(['font', 'img', 'p'], recursive=False):
+        # TODO
+        for item in maincontent.find_all(['font', 'img', 'p'], recursive=True):
             if item.name != 'img':
                 output = item.get_text().strip()
-                if item.find('img') is not None:
-                    output += '\n' + item.find('img').get('src')
+                #if item.find('img') is not None:
+                #    output += '\n' + item.find('img').get('src')
             else:
                 output = item.get('src')
             if len(output) > 0:
@@ -83,23 +96,27 @@ def download_images():
         imgbase = './img/' + filenum + '/'
         if not os.path.exists(imgbase):
             os.makedirs(imgbase)
+        ## TODO
+        #if len(os.listdir(imgbase)) > 0:
+        #    continue
         f = open(base + filename)
         for line in f:
             if line.find('http://') < 0:
                 continue
-            imgmatch = re.search('[0-9]+.(jpg|gif)$', line.strip())
+            imgmatch = re.search('[0-9]+.(jpg|gif|png)$', line.strip())
             if imgmatch is None:
                 print line.strip()
                 continue
             imgname = imgmatch.group(0)
             if os.path.exists(imgbase + imgname):
                 continue
+            print filenum, imgname
             fw = open(imgbase + imgname, 'wb')
             fw.write(urllib.urlopen(line.strip()).read())
             fw.close()
         f.close()
 
-get_everyblog()
+#get_everyblog()
 extract_metas()
 extract_contents()
 download_images()
